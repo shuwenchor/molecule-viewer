@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoleculeViz | 3D Chemical Structure Viewer</title>
+    
+    <!-- 3Dmol.js Library -->
+    <script src="https://3dmol.org/build/3Dmol-min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-dark: #0a0a0f;
+            --bg-card: #12121a;
+            --accent-cyan: #00f5d4;
+            --accent-magenta: #f15bb5;
+            --accent-yellow: #fee440;
+            --text-primary: #ffffff;
+            --text-secondary: #8b8b9e;
+            --border-color: #2a2a3d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Space Mono', monospace;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background grid */
+        .bg-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 245, 212, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 245, 212, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Gradient orbs */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.4;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .orb-1 {
+            width: 400px;
+            height: 400px;
+            background: var(--accent-cyan);
+            top: -100px;
+            right: -100px;
+            animation: float 8s ease-in-out infinite;
+        }
+
+        .orb-2 {
+            width: 300px;
+            height: 300px;
+            background: var(--accent-magenta);
+            bottom: -50px;
+            left: -50px;
+            animation: float 10s ease-in-out infinite reverse;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        /* Main container */
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            font-family: 'Syne', sans-serif;
+            font-size: 3rem;
+            font-weight: 800;
+            letter-spacing: -2px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tagline {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* Input section */
+        .input-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .input-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-magenta), var(--accent-yellow));
+        }
+
+        .input-label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .formula-input {
+            flex: 1;
+            min-width: 200px;
+            background: var(--bg-dark);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px 20px;
+            font-family: 'Space Mono', monospace;
+            font-size: 1.25rem;
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .formula-input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 4px rgba(0, 245, 212, 0.1);
+        }
+
+        .formula-input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.5;
+        }
+
+        .visualize-btn {
+            background: linear-gradient(135deg, var(--accent-cyan), #00c9b7);
+            border: none;
+            border-radius: 12px;
+            padding: 16px 32px;
+            font-family: 'Syne', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--bg-dark);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .visualize-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 245, 212, 0.3);
+        }
+
+        .visualize-btn:active {
+            transform: translateY(0);
+        }
+
+        .visualize-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Quick examples */
+        .examples {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .example-chip {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .example-chip:hover {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+            background: rgba(0, 245, 212, 0.05);
+        }
+
+        /* Viewer section */
+        .viewer-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            min-height: 500px;
+        }
+
+        .viewer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .molecule-name {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .molecule-formula {
+            color: var(--accent-cyan);
+            font-size: 0.9rem;
+        }
+
+        .viewer-container {
+            flex: 1;
+            position: relative;
+            background: linear-gradient(180deg, #0d0d14 0%, #1a1a28 100%);
+        }
+
+        #viewer {
+            width: 100%;
+            height: 100%;
+            min-height: 400px;
+        }
+
+        /* Status messages */
+        .status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .status-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .status-text {
+            font-size: 0.9rem;
+            max-width: 300px;
+        }
+
+        /* Loading spinner */
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Error state */
+        .error {
+            background: rgba(241, 91, 181, 0.1);
+            border: 1px solid var(--accent-magenta);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 16px;
+            color: var(--accent-magenta);
+            font-size: 0.85rem;
+        }
+
+        /* Controls */
+        .viewer-controls {
+            display: flex;
+            gap: 8px;
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-dark);
+        }
+
+        .control-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .control-btn:hover {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        .control-btn.active {
+            background: var(--accent-cyan);
+            border-color: var(--accent-cyan);
+            color: var(--bg-dark);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+        }
+
+        footer a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .logo {
+                font-size: 2rem;
+            }
+
+            .input-section {
+                padding: 24px;
+            }
+
+            .formula-input {
+                font-size: 1rem;
+            }
+
+            .viewer-controls {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background effects -->
+    <div class="bg-grid"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1 class="logo">MoleculeViz</h1>
+            <p class="tagline">3D Chemical Structure Viewer</p>
+        </header>
+
+        <!-- Input Section -->
+        <section class="input-section">
+            <label class="input-label" for="formula">Enter Chemical Formula</label>
+            <div class="input-wrapper">
+                <input 
+                    type="text" 
+                    id="formula" 
+                    class="formula-input" 
+                    placeholder="e.g., H2O, C6H12O6, C8H10N4O2"
+                    autocomplete="off"
+                >
+                <button class="visualize-btn" id="visualize-btn" onclick="visualizeMolecule()">
+                    Visualize
+                </button>
+            </div>
+            <div class="examples">
+                <span class="input-label" style="width: 100%; margin-bottom: 4px; margin-top: 8px;">Quick examples:</span>
+                <button class="example-chip" onclick="setFormula('H2O')">H₂O (Water)</button>
+                <button class="example-chip" onclick="setFormula('C6H12O6')">C₆H₁₂O₆ (Glucose)</button>
+                <button class="example-chip" onclick="setFormula('C8H10N4O2')">C₈H₁₀N₄O₂ (Caffeine)</button>
+                <button class="example-chip" onclick="setFormula('C2H5OH')">C₂H₅OH (Ethanol)</button>
+                <button class="example-chip" onclick="setFormula('C9H8O4')">C₉H₈O₄ (Aspirin)</button>
+                <button class="example-chip" onclick="setFormula('C21H30O2')">C₂₁H₃₀O₂ (THC)</button>
+            </div>
+            <div id="error-container"></div>
+        </section>
+
+        <!-- Viewer Section -->
+        <section class="viewer-section">
+            <div class="viewer-header">
+                <div>
+                    <div class="molecule-name" id="molecule-name">No molecule loaded</div>
+                    <div class="molecule-formula" id="molecule-formula-display"></div>
+                </div>
+            </div>
+            <div class="viewer-container">
+                <div id="viewer"></div>
+                <div class="status" id="status">
+                    <div class="status-icon">⚗️</div>
+                    <p class="status-text">Enter a chemical formula above and click Visualize to see its 3D structure</p>
+                </div>
+            </div>
+            <div class="viewer-controls">
+                <button class="control-btn active" onclick="setStyle('stick')" id="btn-stick">Stick</button>
+                <button class="control-btn" onclick="setStyle('sphere')" id="btn-sphere">Sphere</button>
+                <button class="control-btn" onclick="setStyle('cartoon')" id="btn-cartoon">Ball & Stick</button>
+                <button class="control-btn" onclick="toggleSpin()" id="btn-spin">Spin</button>
+                <button class="control-btn" onclick="resetView()">Reset View</button>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            Powered by <a href="https://pubchem.ncbi.nlm.nih.gov/" target="_blank">PubChem</a> 
+            & <a href="https://3dmol.csb.pitt.edu/" target="_blank">3Dmol.js</a>
+        </footer>
+    </div>
+
+    <script>
+        // Global variables
+        let viewer = null;
+        let currentModel = null;
+        let isSpinning = false;
+        let currentStyle = 'stick';
+
+        // Initialize viewer
+        function initViewer() {
+            const element = document.getElementById('viewer');
+            const config = { backgroundColor: 'transparent' };
+            viewer = $3Dmol.createViewer(element, config);
+        }
+
+        // Set formula from example chip
+        function setFormula(formula) {
+            document.getElementById('formula').value = formula;
+            visualizeMolecule();
+        }
+
+        // Main function to visualize molecule
+        async function visualizeMolecule() {
+            const formula = document.getElementById('formula').value.trim();
+            
+            if (!formula) {
+                showError('Please enter a chemical formula');
+                return;
+            }
+
+            // Show loading state
+            showLoading();
+            hideError();
+
+            try {
+                // Step 1: Get CID from formula
+                const cid = await getCID(formula);
+                
+                // Step 2: Get molecule name
+                const name = await getMoleculeName(cid);
+                
+                // Step 3: Get 3D SDF data
+                const sdfData = await get3DSDF(cid);
+                
+                // Step 4: Render the molecule
+                renderMolecule(sdfData, name, formula);
+                
+            } catch (error) {
+                showError(error.message);
+                hideLoading();
+            }
+        }
+
+        // Fetch CID from PubChem
+        async function getCID(formula) {
+            const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/formula/${encodeURIComponent(formula)}/cids/JSON`;
+            
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`Could not find molecule with formula "${formula}". Try a different formula.`);
+            }
+            
+            const data = await response.json();
+            
+            if (!data.IdentifierList || !data.IdentifierList.CID || data.IdentifierList.CID.length === 0) {
+                throw new Error(`No compounds found for formula "${formula}"`);
+            }
+            
+            // Return the first CID (most common compound)
+            return data.IdentifierList.CID[0];
+        }
+
+        // Fetch molecule name from PubChem
+        async function getMoleculeName(cid) {
+            try {
+                const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/IUPACName,Title/JSON`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.PropertyTable && data.PropertyTable.Properties && data.PropertyTable.Properties[0]) {
+                    return data.PropertyTable.Properties[0].Title || data.PropertyTable.Properties[0].IUPACName || 'Unknown';
+                }
+                return 'Unknown';
+            } catch {
+                return 'Unknown';
+            }
+        }
+
+        // Fetch 3D SDF from PubChem
+        async function get3DSDF(cid) {
+            const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/SDF?record_type=3d`;
+            
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error('3D structure not available for this compound. Try a different molecule.');
+            }
+            
+            return await response.text();
+        }
+
+        // Render molecule in 3Dmol.js
+        function renderMolecule(sdfData, name, formula) {
+            // Hide status message
+            document.getElementById('status').style.display = 'none';
+            
+            // Update info display
+            document.getElementById('molecule-name').textContent = name;
+            document.getElementById('molecule-formula-display').textContent = formatFormula(formula);
+            
+            // Clear and render
+            viewer.removeAllModels();
+            currentModel = viewer.addModel(sdfData, 'sdf');
+            
+            // Apply current style
+            applyStyle(currentStyle);
+            
+            viewer.zoomTo();
+            viewer.render();
+            
+            // Start spinning if it was enabled
+            if (isSpinning) {
+                viewer.spin(true);
+            }
+        }
+
+        // Apply visual style
+        function applyStyle(style) {
+            viewer.setStyle({}, {});
+            
+            switch(style) {
+                case 'stick':
+                    viewer.setStyle({}, {
+                        stick: { radius: 0.15, colorscheme: 'Jmol' }
+                    });
+                    break;
+                case 'sphere':
+                    viewer.setStyle({}, {
+                        sphere: { scale: 0.3, colorscheme: 'Jmol' }
+                    });
+                    break;
+                case 'cartoon':
+                    viewer.setStyle({}, {
+                        stick: { radius: 0.1, colorscheme: 'Jmol' },
+                        sphere: { scale: 0.25, colorscheme: 'Jmol' }
+                    });
+                    break;
+            }
+            
+            viewer.render();
+        }
+
+        // Set style and update buttons
+        function setStyle(style) {
+            currentStyle = style;
+            
+            // Update button states
+            document.querySelectorAll('.control-btn').forEach(btn => {
+                if (btn.id.startsWith('btn-')) {
+                    btn.classList.remove('active');
+                }
+            });
+            document.getElementById('btn-' + style).classList.add('active');
+            
+            if (currentModel) {
+                applyStyle(style);
+            }
+        }
+
+        // Toggle spin animation
+        function toggleSpin() {
+            isSpinning = !isSpinning;
+            const btn = document.getElementById('btn-spin');
+            
+            if (isSpinning) {
+                btn.classList.add('active');
+                viewer.spin(true);
+            } else {
+                btn.classList.remove('active');
+                viewer.spin(false);
+            }
+        }
+
+        // Reset view
+        function resetView() {
+            if (viewer) {
+                viewer.zoomTo();
+                viewer.render();
+            }
+        }
+
+        // Format formula with subscripts (for display)
+        function formatFormula(formula) {
+            return formula.replace(/(\d+)/g, (match) => {
+                const subscripts = '₀₁₂₃₄₅₆₇₈₉';
+                return match.split('').map(d => subscripts[parseInt(d)]).join('');
+            });
+        }
+
+        // Show loading state
+        function showLoading() {
+            const status = document.getElementById('status');
+            status.style.display = 'block';
+            status.innerHTML = `
+                <div class="loader"></div>
+                <p class="status-text">Fetching molecular structure from PubChem...</p>
+            `;
+            document.getElementById('visualize-btn').disabled = true;
+        }
+
+        // Hide loading state
+        function hideLoading() {
+            document.getElementById('visualize-btn').disabled = false;
+        }
+
+        // Show error message
+        function showError(message) {
+            const container = document.getElementById('error-container');
+            container.innerHTML = `<div class="error">⚠️ ${message}</div>`;
+            
+            // Reset status display
+            const status = document.getElementById('status');
+            status.style.display = 'block';
+            status.innerHTML = `
+                <div class="status-icon">⚗️</div>
+                <p class="status-text">Enter a chemical formula above and click Visualize to see its 3D structure</p>
+            `;
+        }
+
+        // Hide error message
+        function hideError() {
+            document.getElementById('error-container').innerHTML = '';
+        }
+
+        // Enter key to submit
+        document.getElementById('formula').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                visualizeMolecule();
+            }
+        });
+
+        // Initialize on page load
+        window.onload = initViewer;
+    </script>
+</body>
+</html>
